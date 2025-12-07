@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pure Go Prism 🔺</title>
+  <script src="wasm_exec.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg-0: #0d1117;
+      --bg-1: #161b22;
+      --bg-2: #21262d;
+      --bg-3: #30363d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-dim: #7d8590;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --red: #f85149;
+      --purple: #a371f7;
+      --cyan: #39c5cf;
+      --orange: #db6d28;
+      --pink: #db61a2;
+      --go-blue: #00ADD8;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-0);
+      color: var(--text);
+      font-size: 13px;
+    }
+    
+    .app { display: flex; flex-direction: column; height: 100vh; }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.6rem 1rem;
+      background: var(--bg-1);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--purple), var(--pink), var(--orange));
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .tag {
+      font-size: 9px;
+      padding: 0.15rem 0.4rem;
+      background: var(--purple);
+      color: #fff;
+      border-radius: 3px;
+    }
+    
+    .tag.wasm { background: var(--green); }
+    .tag.regex { background: var(--yellow); color: #000; }
+    
+    .header-stats {
+      display: flex;
+      gap: 1rem;
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+    
+    .header-stats strong { color: var(--text); }
+    
+    .btn {
+      padding: 0.45rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-2);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: inherit;
+    }
+    
+    .btn:hover { background: var(--bg-3); border-color: var(--accent); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--go-blue); border-color: var(--go-blue); color: #fff; }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 11px; }
+    
+    .main { display: flex; flex: 1; overflow: hidden; }
+    
+    .left-panel {
+      width: 320px;
+      background: var(--bg-1);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .panel-section { border-bottom: 1px solid var(--border); }
+    
+    .panel-header {
+      padding: 0.5rem 0.75rem;
+      background: var(--bg-2);
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .panel-content { padding: 0.75rem; }
+    
+    .url-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    
+    .url-row { display: flex; gap: 0.4rem; align-items: center; }
+    
+    .url-input {
+      flex: 1;
+      padding: 0.5rem;
+      background: var(--bg-0);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 11px;
+      font-family: monospace;
+      outline: none;
+    }
+    
+    .url-input:focus { border-color: var(--accent); }
+    
+    .url-remove {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 16px;
+    }
+    
+    .url-remove:hover { color: var(--red); }
+    
+    .filter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.4rem;
+    }
+    
+    .filter-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 0.5rem;
+      background: var(--bg-0);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text-dim);
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    
+    .filter-btn:hover { border-color: var(--accent); }
+    .filter-btn.active { background: var(--bg-3); border-color: var(--accent); color: var(--text); }
+    
+    .filter-icon {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      font-size: 9px;
+      font-weight: 600;
+    }
+    
+    .filter-icon.func { background: rgba(88, 166, 255, 0.15); color: var(--accent); }
+    .filter-icon.method { background: rgba(57, 197, 207, 0.15); color: var(--cyan); }
+    .filter-icon.struct { background: rgba(63, 185, 80, 0.15); color: var(--green); }
+    .filter-icon.interface { background: rgba(163, 113, 247, 0.15); color: var(--purple); }
+    .filter-icon.type { background: rgba(219, 97, 162, 0.15); color: var(--pink); }
+    .filter-icon.const { background: rgba(210, 153, 34, 0.15); color: var(--yellow); }
+    .filter-icon.var { background: rgba(219, 109, 40, 0.15); color: var(--orange); }
+    
+    .filter-count {
+      margin-left: auto;
+      font-size: 10px;
+      background: var(--bg-2);
+      padding: 0.1rem 0.35rem;
+      border-radius: 8px;
+    }
+    
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding-top: 0.5rem;
+      font-size: 11px;
+    }
+    
+    .toggle {
+      width: 32px;
+      height: 18px;
+      background: var(--bg-3);
+      border-radius: 9px;
+      position: relative;
+      cursor: pointer;
+    }
+    
+    .toggle.on { background: var(--go-blue); }
+    
+    .toggle::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      transition: left 0.2s;
+    }
+    
+    .toggle.on::after { left: 16px; }
+    
+    .search-box {
+      padding: 0.5rem;
+      background: var(--bg-0);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .search-input {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 11px;
+      outline: none;
+    }
+    
+    .search-input:focus { border-color: var(--accent); }
+    
+    .search-hint {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.4rem;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+    
+    .kbd {
+      background: var(--bg-3);
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+    
+    .decl-list { flex: 1; overflow-y: auto; }
+    
+    .decl-group { border-bottom: 1px solid var(--border); }
+    
+    .decl-group-header {
+      padding: 0.5rem 0.75rem;
+      background: var(--bg-2);
+      font-size: 10px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+    }
+    
+    .decl-group-header:hover { background: var(--bg-3); }
+    
+    .decl-arrow { font-size: 8px; transition: transform 0.15s; }
+    .decl-arrow.open { transform: rotate(90deg); }
+    
+    .decl-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.75rem 0.4rem 1.25rem;
+      cursor: pointer;
+      font-size: 11px;
+      border-left: 2px solid transparent;
+      user-select: none;
+    }
+    
+    .decl-item:hover { background: var(--bg-2); }
+    .decl-item.selected { background: rgba(88, 166, 255, 0.1); border-left-color: var(--accent); }
+    
+    .decl-check {
+      width: 14px;
+      height: 14px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: transparent;
+      flex-shrink: 0;
+    }
+    
+    .decl-item.selected .decl-check {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    
+    .decl-name { font-family: monospace; color: var(--accent); }
+    .decl-receiver { font-family: monospace; color: var(--cyan); font-size: 10px; }
+    .decl-file {
+      margin-left: auto;
+      font-size: 9px;
+      color: var(--text-dim);
+      background: var(--bg-3);
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+    }
+    
+    .right-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-0);
+    }
+    
+    .code-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg-1);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .code-title { font-weight: 500; }
+    .code-meta { font-size: 11px; color: var(--text-dim); }
+    .code-actions { margin-left: auto; }
+    
+    .code-container { flex: 1; overflow: auto; }
+    
+    .code-block {
+      padding: 1rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre;
+    }
+    
+    /* Go Syntax Highlighting */
+    .go-kw { color: #ff7b72; }
+    .go-type { color: #79c0ff; }
+    .go-str { color: #a5d6ff; }
+    .go-num { color: #79c0ff; }
+    .go-cmt { color: #8b949e; font-style: italic; }
+    .go-fn { color: #d2a8ff; }
+    
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      text-align: center;
+    }
+    
+    .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.3; }
+    .empty-title { font-size: 16px; color: var(--text); margin-bottom: 0.5rem; }
+    
+    .ct-panel {
+      padding: 0.5rem 0.75rem;
+      background: var(--bg-2);
+      border-top: 1px solid var(--border);
+    }
+    
+    .ct-title { font-size: 9px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.3rem; }
+    .ct-ops { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+    .ct-op { font-size: 9px; padding: 0.15rem 0.35rem; background: var(--bg-3); border-radius: 3px; color: var(--text-dim); }
+    .ct-op.active { background: var(--purple); color: #fff; }
+    
+    .progress-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .progress-card {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      min-width: 400px;
+      text-align: center;
+    }
+    
+    .progress-title { font-size: 18px; margin-bottom: 1rem; }
+    .progress-stage { margin-bottom: 0.5rem; }
+    .progress-detail { font-size: 11px; color: var(--text-dim); font-family: monospace; margin-bottom: 1rem; }
+    
+    .progress-bar { height: 6px; background: var(--bg-3); border-radius: 3px; overflow: hidden; margin-bottom: 0.5rem; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--purple), var(--pink)); transition: width 0.2s; }
+    .progress-count { font-size: 11px; color: var(--text-dim); }
+    
+    .toast {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      padding: 0.75rem 1.25rem;
+      background: var(--green);
+      color: #fff;
+      border-radius: 8px;
+      z-index: 1000;
+    }
+    
+    .error-banner {
+      padding: 0.75rem 1rem;
+      background: rgba(248, 81, 73, 0.1);
+      border-bottom: 1px solid var(--red);
+      color: var(--red);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useMemo, useEffect } = React;
+
+    // ============================================================
+    // WASM PARSER STATE
+    // ============================================================
+    
+    let wasmReady = false;
+    let wasmLoading = true;
+    
+    async function loadWasm() {
+      try {
+        const go = new Go();
+        const result = await WebAssembly.instantiateStreaming(
+          fetch('parser.wasm'),
+          go.importObject
+        );
+        go.run(result.instance);
+        wasmReady = true;
+        wasmLoading = false;
+        console.log('✅ WASM parser ready (go/ast + go/parser)');
+        return true;
+      } catch (e) {
+        wasmLoading = false;
+        console.warn('⚠️ WASM failed, using regex fallback:', e.message);
+        return false;
+      }
+    }
+    
+    // Start loading immediately
+    const wasmPromise = loadWasm();
+
+    // ============================================================
+    // CATEGORY THEORY LIBRARY
+    // ============================================================
+    
+    const Result = {
+      ok: (value) => ({ tag: 'ok', value }),
+      err: (error) => ({ tag: 'err', error }),
+      isOk: (r) => r.tag === 'ok'
+    };
+
+    const Functor = {
+      Array: { fmap: (f, xs) => xs.map(f) }
+    };
+
+    const Applicative = {
+      Promise: {
+        traverse: (f, xs) => Promise.all(xs.map(f)),
+        traverseN: async (n, f, xs) => {
+          const results = [];
+          for (let i = 0; i < xs.length; i += n) {
+            const batch = await Promise.all(xs.slice(i, i + n).map(f));
+            results.push(...batch);
+          }
+          return results;
+        }
+      }
+    };
+
+    const Monoid = {
+      Declarations: {
+        empty: () => ({
+          functions: [], methods: [], structs: [], interfaces: [],
+          types: [], constants: [], variables: [], imports: []
+        }),
+        concat: (a, b) => ({
+          functions: [...a.functions, ...b.functions],
+          methods: [...a.methods, ...b.methods],
+          structs: [...a.structs, ...b.structs],
+          interfaces: [...a.interfaces, ...b.interfaces],
+          types: [...a.types, ...b.types],
+          constants: [...a.constants, ...b.constants],
+          variables: [...a.variables, ...b.variables],
+          imports: [...a.imports, ...b.imports]
+        })
+      }
+    };
+
+    const Foldable = {
+      Array: {
+        foldMap: (monoid, f, xs) => xs.reduce((acc, x) => monoid.concat(acc, f(x)), monoid.empty())
+      }
+    };
+
+    const Filterable = {
+      Array: { filter: (p, xs) => xs.filter(p) }
+    };
+
+    // ============================================================
+    // GO SYNTAX HIGHLIGHTER
+    // ============================================================
+    
+    const GoHighlighter = {
+      highlight: (code) => {
+        let html = code
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        
+        const tokens = [];
+        let i = 0;
+        
+        while (i < html.length) {
+          if (html.slice(i, i + 2) === '/*') {
+            const end = html.indexOf('*/', i + 2);
+            const endIdx = end === -1 ? html.length : end + 2;
+            tokens.push(`<span class="go-cmt">${html.slice(i, endIdx)}</span>`);
+            i = endIdx;
+            continue;
+          }
+          
+          if (html.slice(i, i + 2) === '//') {
+            const end = html.indexOf('\n', i);
+            const endIdx = end === -1 ? html.length : end;
+            tokens.push(`<span class="go-cmt">${html.slice(i, endIdx)}</span>`);
+            i = endIdx;
+            continue;
+          }
+          
+          if (html[i] === '"') {
+            let j = i + 1;
+            while (j < html.length && html[j] !== '"') {
+              if (html[j] === '\\') j++;
+              j++;
+            }
+            tokens.push(`<span class="go-str">${html.slice(i, j + 1)}</span>`);
+            i = j + 1;
+            continue;
+          }
+          
+          if (html[i] === '`') {
+            const end = html.indexOf('`', i + 1);
+            const endIdx = end === -1 ? html.length : end + 1;
+            tokens.push(`<span class="go-str">${html.slice(i, endIdx)}</span>`);
+            i = endIdx;
+            continue;
+          }
+          
+          if (/[0-9]/.test(html[i]) && (i === 0 || /[\s\(\[{,=:+\-*/%<>!&|^]/.test(html[i-1]))) {
+            let j = i;
+            while (j < html.length && /[0-9.xXa-fA-FeE+\-]/.test(html[j])) j++;
+            tokens.push(`<span class="go-num">${html.slice(i, j)}</span>`);
+            i = j;
+            continue;
+          }
+          
+          if (/[a-zA-Z_]/.test(html[i])) {
+            let j = i;
+            while (j < html.length && /[a-zA-Z0-9_]/.test(html[j])) j++;
+            const word = html.slice(i, j);
+            
+            const keywords = ['func', 'type', 'struct', 'interface', 'const', 'var', 'package', 'import',
+                             'return', 'if', 'else', 'for', 'range', 'switch', 'case', 'default', 'break',
+                             'continue', 'go', 'defer', 'select', 'chan', 'map', 'make', 'new', 'nil',
+                             'true', 'false', 'iota', 'fallthrough', 'goto'];
+            
+            const types = ['string', 'int', 'int8', 'int16', 'int32', 'int64', 'uint', 'uint8', 'uint16',
+                          'uint32', 'uint64', 'float32', 'float64', 'complex64', 'complex128',
+                          'bool', 'byte', 'rune', 'error', 'any', 'uintptr'];
+            
+            const nextChar = html[j] || '';
+            
+            if (keywords.includes(word)) {
+              tokens.push(`<span class="go-kw">${word}</span>`);
+            } else if (types.includes(word)) {
+              tokens.push(`<span class="go-type">${word}</span>`);
+            } else if (nextChar === '(') {
+              tokens.push(`<span class="go-fn">${word}</span>`);
+            } else if (word[0] === word[0].toUpperCase() && /[a-zA-Z]/.test(word[0])) {
+              tokens.push(`<span class="go-type">${word}</span>`);
+            } else {
+              tokens.push(word);
+            }
+            i = j;
+            continue;
+          }
+          
+          tokens.push(html[i]);
+          i++;
+        }
+        
+        return tokens.join('');
+      }
+    };
+
+    // ============================================================
+    // GO PARSER (WASM with regex fallback)
+    // ============================================================
+    
+    const GoParser = {
+      parse: (source, filePath, repo) => {
+        if (wasmReady && typeof parseGoSource === 'function') {
+          return GoParser.parseWasm(source, filePath, repo);
+        }
+        return GoParser.parseRegex(source, filePath, repo);
+      },
+      
+      parseWasm: (source, filePath, repo) => {
+        try {
+          const result = parseGoSource(source, filePath);
+          
+          if (result.error) {
+            console.warn('WASM parse error:', result.error);
+            return GoParser.parseRegex(source, filePath, repo);
+          }
+          
+          const decls = Monoid.Declarations.empty();
+          
+          for (const d of result.declarations || []) {
+            const decl = {
+              kind: d.kind,
+              name: d.name,
+              source: d.source,
+              signature: d.signature || d.source,
+              doc: d.doc,
+              file: filePath,
+              repo: repo,
+              startLine: d.startLine,
+              endLine: d.endLine,
+              exported: d.exported,
+              hasBody: d.source && d.source.includes('{'),
+              receiver: d.receiver
+            };
+            
+            switch (d.kind) {
+              case 'function': decls.functions.push(decl); break;
+              case 'method': decls.methods.push(decl); break;
+              case 'struct': decls.structs.push(decl); break;
+              case 'interface': decls.interfaces.push(decl); break;
+              case 'type': decls.types.push(decl); break;
+              case 'const': decls.constants.push(decl); break;
+              case 'var': decls.variables.push(decl); break;
+            }
+          }
+          
+          return decls;
+        } catch (e) {
+          console.warn('WASM error:', e);
+          return GoParser.parseRegex(source, filePath, repo);
+        }
+      },
+      
+      parseRegex: (source, filePath, repo) => {
+        const decls = Monoid.Declarations.empty();
+        const lines = source.split('\n');
+        let i = 0;
+        
+        const collectBlock = (start) => {
+          let depth = 0, started = false;
+          const block = [];
+          for (let j = start; j < lines.length; j++) {
+            block.push(lines[j]);
+            for (const c of lines[j]) {
+              if (c === '{') { depth++; started = true; }
+              if (c === '}') depth--;
+            }
+            if (started && depth === 0) return { source: block.join('\n'), end: j };
+          }
+          return { source: block.join('\n'), end: start + block.length - 1 };
+        };
+        
+        const collectComments = (before) => {
+          const cmts = [];
+          let j = before - 1;
+          while (j >= 0 && lines[j].trim().startsWith('//')) {
+            cmts.unshift(lines[j]);
+            j--;
+          }
+          return cmts.join('\n');
+        };
+        
+        while (i < lines.length) {
+          const line = lines[i];
+          const trim = line.trim();
+          
+          if (!trim || trim.startsWith('//') || trim.startsWith('package ')) { i++; continue; }
+          
+          if (trim.startsWith('import ')) {
+            if (trim.includes('(')) {
+              const { source, end } = collectBlock(i);
+              decls.imports.push({ kind: 'import', name: 'imports', source, file: filePath, repo, startLine: i + 1 });
+              i = end + 1;
+            } else {
+              decls.imports.push({ kind: 'import', name: trim, source: line, file: filePath, repo, startLine: i + 1 });
+              i++;
+            }
+            continue;
+          }
+          
+          const funcMatch = trim.match(/^func\s+([A-Za-z_]\w*)\s*(?:\[.*?\])?\s*\(/);
+          if (funcMatch && !trim.match(/^func\s*\(/)) {
+            const comments = collectComments(i);
+            const { source, end } = collectBlock(i);
+            const fullSrc = comments ? comments + '\n' + source : source;
+            const sig = source.match(/^func[^{]+/)?.[0]?.trim() || trim;
+            decls.functions.push({ kind: 'function', name: funcMatch[1], signature: sig, source: fullSrc, file: filePath, repo, startLine: i + 1, hasBody: source.includes('{') });
+            i = end + 1;
+            continue;
+          }
+          
+          const methodMatch = trim.match(/^func\s*\(\s*(\w+)\s+(\*?\w+)\s*\)\s*(\w+)\s*(?:\[.*?\])?\s*\(/);
+          if (methodMatch) {
+            const comments = collectComments(i);
+            const { source, end } = collectBlock(i);
+            const fullSrc = comments ? comments + '\n' + source : source;
+            const sig = source.match(/^func\s*\([^)]+\)[^{]+/)?.[0]?.trim() || trim;
+            decls.methods.push({ kind: 'method', name: methodMatch[3], receiver: methodMatch[2], signature: sig, source: fullSrc, file: filePath, repo, startLine: i + 1, hasBody: source.includes('{') });
+            i = end + 1;
+            continue;
+          }
+          
+          const structMatch = trim.match(/^type\s+(\w+)\s*(?:\[.*?\])?\s+struct\b/);
+          if (structMatch) {
+            const comments = collectComments(i);
+            const { source, end } = collectBlock(i);
+            const fullSrc = comments ? comments + '\n' + source : source;
+            decls.structs.push({ kind: 'struct', name: structMatch[1], source: fullSrc, file: filePath, repo, startLine: i + 1 });
+            i = end + 1;
+            continue;
+          }
+          
+          const ifaceMatch = trim.match(/^type\s+(\w+)\s*(?:\[.*?\])?\s+interface\b/);
+          if (ifaceMatch) {
+            const comments = collectComments(i);
+            const { source, end } = collectBlock(i);
+            const fullSrc = comments ? comments + '\n' + source : source;
+            decls.interfaces.push({ kind: 'interface', name: ifaceMatch[1], source: fullSrc, file: filePath, repo, startLine: i + 1 });
+            i = end + 1;
+            continue;
+          }
+          
+          const typeMatch = trim.match(/^type\s+(\w+)\s/);
+          if (typeMatch && !structMatch && !ifaceMatch) {
+            const comments = collectComments(i);
+            if (trim.includes('{')) {
+              const { source, end } = collectBlock(i);
+              const fullSrc = comments ? comments + '\n' + source : source;
+              decls.types.push({ kind: 'type', name: typeMatch[1], source: fullSrc, file: filePath, repo, startLine: i + 1 });
+              i = end + 1;
+            } else {
+              const fullSrc = comments ? comments + '\n' + line : line;
+              decls.types.push({ kind: 'type', name: typeMatch[1], source: fullSrc, file: filePath, repo, startLine: i + 1 });
+              i++;
+            }
+            continue;
+          }
+          
+          if (trim.startsWith('const ')) {
+            const comments = collectComments(i);
+            if (trim.includes('(')) {
+              const { source, end } = collectBlock(i);
+              const fullSrc = comments ? comments + '\n' + source : source;
+              decls.constants.push({ kind: 'const', name: 'const block', source: fullSrc, file: filePath, repo, startLine: i + 1 });
+              i = end + 1;
+            } else {
+              const m = trim.match(/^const\s+(\w+)/);
+              const fullSrc = comments ? comments + '\n' + line : line;
+              decls.constants.push({ kind: 'const', name: m?.[1] || 'const', source: fullSrc, file: filePath, repo, startLine: i + 1 });
+              i++;
+            }
+            continue;
+          }
+          
+          if (trim.startsWith('var ')) {
+            const comments = collectComments(i);
+            if (trim.includes('(')) {
+              const { source, end } = collectBlock(i);
+              const fullSrc = comments ? comments + '\n' + source : source;
+              decls.variables.push({ kind: 'var', name: 'var block', source: fullSrc, file: filePath, repo, startLine: i + 1 });
+              i = end + 1;
+            } else {
+              const m = trim.match(/^var\s+(\w+)/);
+              const fullSrc = comments ? comments + '\n' + line : line;
+              decls.variables.push({ kind: 'var', name: m?.[1] || 'var', source: fullSrc, file: filePath, repo, startLine: i + 1 });
+              i++;
+            }
+            continue;
+          }
+          
+          i++;
+        }
+        
+        return decls;
+      },
+      
+      getSignatureOnly: (decl) => {
+        // WASM gives us signature directly
+        if (decl.signature && decl.signature !== decl.source) {
+          const lines = [];
+          if (decl.doc) lines.push('// ' + decl.doc.split('\n').join('\n// '));
+          lines.push(decl.signature);
+          return lines.join('\n');
+        }
+        
+        if (!decl.hasBody) return decl.source;
+        const srcLines = decl.source.split('\n');
+        const result = [];
+        for (const l of srcLines) {
+          if (l.trim().startsWith('//')) result.push(l);
+          else break;
+        }
+        const sig = decl.source.match(/(func\s+(?:\([^)]+\)\s*)?\w+\s*(?:\[.*?\])?\s*\([^)]*\)\s*(?:\([^)]*\)|[\w\[\]\*\.\s,]+)?)/);
+        if (sig) result.push(sig[1]);
+        return result.join('\n');
+      }
+    };
+
+    // ============================================================
+    // GITHUB API
+    // ============================================================
+    
+    const GitHub = {
+      parseUrl: (url) => {
+        const m = url.match(/github\.com\/([^\/]+)\/([^\/\s]+)/);
+        if (!m) return null;
+        return { owner: m[1], repo: m[2].replace(/\.git$/, ''), branch: 'main' };
+      },
+      
+      fetchTree: async (owner, repo) => {
+        for (const branch of ['main', 'master']) {
+          try {
+            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`);
+            if (res.ok) {
+              const data = await res.json();
+              return { ...data, branch };
+            }
+          } catch (e) { /* try next */ }
+        }
+        throw new Error(`Failed to fetch ${owner}/${repo}`);
+      },
+      
+      fetchFile: async (owner, repo, branch, path) => {
+        const res = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`);
+        if (!res.ok) throw new Error(`Failed: ${path}`);
+        return res.text();
+      }
+    };
+
+    // ============================================================
+    // PIPELINE
+    // ============================================================
+    
+    const Pipeline = {
+      run: async (urls, onProgress) => {
+        const ctOps = new Set();
+        
+        // Wait for WASM to finish loading
+        await wasmPromise;
+        
+        const parsed = urls.map(u => ({ url: u, parsed: GitHub.parseUrl(u) })).filter(x => x.parsed);
+        if (!parsed.length) return Result.err('No valid GitHub URLs');
+        
+        onProgress({ stage: 'trees', message: 'Fetching repos...' });
+        ctOps.add('Applicative');
+        
+        const trees = await Applicative.Promise.traverse(async ({ url, parsed }) => {
+          try {
+            const tree = await GitHub.fetchTree(parsed.owner, parsed.repo);
+            return Result.ok({ url, parsed, tree, branch: tree.branch });
+          } catch (e) {
+            return Result.err({ url, error: e.message });
+          }
+        }, parsed);
+        
+        const okTrees = trees.filter(Result.isOk).map(r => r.value);
+        if (!okTrees.length) return Result.err('Failed to fetch repos');
+        
+        ctOps.add('Filterable');
+        const allFiles = [];
+        for (const { parsed, tree, branch } of okTrees) {
+          const goFiles = Filterable.Array.filter(
+            f => f.type === 'blob' && f.path.endsWith('.go') && !f.path.includes('vendor/') && !f.path.includes('_test.go'),
+            tree.tree || []
+          );
+          for (const f of goFiles) {
+            allFiles.push({ ...f, owner: parsed.owner, repo: parsed.repo, branch });
+          }
+        }
+        
+        if (!allFiles.length) return Result.err('No Go files found');
+        
+        onProgress({ stage: 'fetch', message: `Fetching ${allFiles.length} files...`, total: allFiles.length, current: 0 });
+        
+        let count = 0;
+        const contents = await Applicative.Promise.traverseN(10, async (f) => {
+          try {
+            const content = await GitHub.fetchFile(f.owner, f.repo, f.branch, f.path);
+            count++;
+            onProgress({ stage: 'fetch', message: 'Fetching...', detail: f.path, total: allFiles.length, current: count });
+            return Result.ok({ ...f, content });
+          } catch (e) {
+            count++;
+            return Result.err(e.message);
+          }
+        }, allFiles);
+        
+        const okContents = contents.filter(Result.isOk).map(r => r.value);
+        
+        ctOps.add('Functor');
+        onProgress({ stage: 'parse', message: wasmReady ? 'Parsing with go/ast...' : 'Parsing (regex)...' });
+        const parsedDecls = Functor.Array.fmap(f => GoParser.parse(f.content, f.path, `${f.owner}/${f.repo}`), okContents);
+        
+        ctOps.add('Foldable');
+        ctOps.add('Monoid');
+        const all = Foldable.Array.foldMap(Monoid.Declarations, d => d, parsedDecls);
+        all.meta = { repos: okTrees.map(t => `${t.parsed.owner}/${t.parsed.repo}`), fileCount: okContents.length };
+        
+        onProgress({ stage: 'done', message: 'Done!' });
+        return Result.ok({ declarations: all, ctOps: [...ctOps] });
+      }
+    };
+
+    // ============================================================
+    // APP
+    // ============================================================
+    
+    function App() {
+      const [urls, setUrls] = useState([{ id: 1, value: 'https://github.com/gin-gonic/gin' }]);
+      const [decls, setDecls] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [progress, setProgress] = useState(null);
+      const [error, setError] = useState(null);
+      const [filters, setFilters] = useState({ functions: true, methods: true, structs: true, interfaces: true, types: false, constants: false, variables: false });
+      const [includeImpl, setIncludeImpl] = useState(true);
+      const [selected, setSelected] = useState(new Set());
+      const [search, setSearch] = useState('');
+      const [expanded, setExpanded] = useState({});
+      const [toast, setToast] = useState(null);
+      const [ctOps, setCtOps] = useState([]);
+      const [lastKey, setLastKey] = useState(null);
+      const [parserMode, setParserMode] = useState('loading');
+      
+      useEffect(() => {
+        wasmPromise.then(ok => setParserMode(ok ? 'wasm' : 'regex'));
+      }, []);
+      
+      const addUrl = () => setUrls([...urls, { id: Date.now(), value: '' }]);
+      const removeUrl = (id) => urls.length > 1 && setUrls(urls.filter(u => u.id !== id));
+      const updateUrl = (id, val) => setUrls(urls.map(u => u.id === id ? { ...u, value: val } : u));
+      
+      const explore = async () => {
+        const valid = urls.filter(u => u.value.trim()).map(u => u.value.trim());
+        if (!valid.length) { setError('Enter at least one URL'); return; }
+        
+        setLoading(true);
+        setError(null);
+        setDecls(null);
+        setSelected(new Set());
+        
+        const result = await Pipeline.run(valid, p => {
+          setProgress(p);
+        });
+        
+        setLoading(false);
+        setProgress(null);
+        
+        if (Result.isOk(result)) {
+          setDecls(result.value.declarations);
+          setCtOps(result.value.ctOps);
+          setExpanded({ functions: true });
+        } else {
+          setError(result.error);
+        }
+      };
+      
+      const counts = useMemo(() => {
+        if (!decls) return {};
+        return {
+          functions: decls.functions.length,
+          methods: decls.methods.length,
+          structs: decls.structs.length,
+          interfaces: decls.interfaces.length,
+          types: decls.types.length,
+          constants: decls.constants.length,
+          variables: decls.variables.length
+        };
+      }, [decls]);
+      
+      const filtered = useMemo(() => {
+        if (!decls) return {};
+        const result = {};
+        const q = search.toLowerCase();
+        for (const [kind, on] of Object.entries(filters)) {
+          if (!on) continue;
+          let items = decls[kind] || [];
+          if (q) items = items.filter(d => d.name.toLowerCase().includes(q) || d.file.toLowerCase().includes(q) || (d.receiver || '').toLowerCase().includes(q));
+          if (items.length) result[kind] = items;
+        }
+        return result;
+      }, [decls, filters, search]);
+      
+      const flatItems = useMemo(() => {
+        const items = [];
+        for (const [kind, list] of Object.entries(filtered)) {
+          for (const item of list) {
+            items.push({ key: `${item.kind}:${item.name}:${item.file}:${item.startLine}`, item });
+          }
+        }
+        return items;
+      }, [filtered]);
+      
+      const totalFiltered = flatItems.length;
+      
+      const toggleItem = (item, e) => {
+        const key = `${item.kind}:${item.name}:${item.file}:${item.startLine}`;
+        const next = new Set(selected);
+        
+        if (e && e.shiftKey && lastKey) {
+          const lastIdx = flatItems.findIndex(f => f.key === lastKey);
+          const currIdx = flatItems.findIndex(f => f.key === key);
+          if (lastIdx !== -1 && currIdx !== -1) {
+            const start = Math.min(lastIdx, currIdx);
+            const end = Math.max(lastIdx, currIdx);
+            for (let i = start; i <= end; i++) next.add(flatItems[i].key);
+            setSelected(next);
+            setLastKey(key);
+            return;
+          }
+        }
+        
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        setSelected(next);
+        setLastKey(key);
+      };
+      
+      const selectAll = () => { const s = new Set(); flatItems.forEach(f => s.add(f.key)); setSelected(s); };
+      const clearAll = () => { setSelected(new Set()); setLastKey(null); };
+      const invert = () => { const s = new Set(); flatItems.forEach(f => { if (!selected.has(f.key)) s.add(f.key); }); setSelected(s); };
+      const expandAll = () => { const e = {}; Object.keys(filtered).forEach(k => e[k] = true); setExpanded(e); };
+      const collapseAll = () => setExpanded({});
+      
+      const output = useMemo(() => {
+        if (!selected.size) return '';
+        const items = flatItems.filter(f => selected.has(f.key)).map(f => f.item);
+        const byRepo = {};
+        for (const d of items) {
+          const repo = d.repo || 'unknown';
+          if (!byRepo[repo]) byRepo[repo] = {};
+          if (!byRepo[repo][d.file]) byRepo[repo][d.file] = [];
+          byRepo[repo][d.file].push(d);
+        }
+        
+        const lines = [];
+        for (const [repo, files] of Object.entries(byRepo)) {
+          lines.push(`// ===== Repository: ${repo} =====\n`);
+          for (const [file, ds] of Object.entries(files)) {
+            lines.push(`// ----- File: ${file} -----\n`);
+            for (const d of ds) {
+              lines.push(includeImpl ? d.source : GoParser.getSignatureOnly(d));
+              lines.push('');
+            }
+          }
+        }
+        return lines.join('\n');
+      }, [selected, flatItems, includeImpl]);
+      
+      const highlightedOutput = useMemo(() => {
+        if (!output) return '';
+        return GoHighlighter.highlight(output);
+      }, [output]);
+      
+      const copy = () => {
+        navigator.clipboard.writeText(output);
+        setToast('Copied!');
+        setTimeout(() => setToast(null), 2000);
+      };
+      
+      return (
+        <div className="app">
+          <div className="header">
+            <div className="logo">
+              <div className="logo-icon">🔺</div>
+              <span>Pure Go Prism</span>
+              <span className="tag">CT</span>
+              {parserMode === 'wasm' && <span className="tag wasm">WASM</span>}
+              {parserMode === 'regex' && <span className="tag regex">Regex</span>}
+            </div>
+            {decls && (
+              <div className="header-stats">
+                Repos: <strong>{decls.meta?.repos.length}</strong> &nbsp;
+                Files: <strong>{decls.meta?.fileCount}</strong> &nbsp;
+                Selected: <strong>{selected.size}</strong>
+              </div>
+            )}
+            <button className="btn btn-primary" onClick={explore} disabled={loading}>
+              {loading ? '⏳ Loading...' : '🚀 Explore'}
+            </button>
+          </div>
+          
+          {error && <div className="error-banner">⚠️ {error}</div>}
+          
+          <div className="main">
+            <div className="left-panel">
+              <div className="panel-section">
+                <div className="panel-header">
+                  <span>GitHub Repos</span>
+                  <button className="btn btn-sm" onClick={addUrl}>+ Add</button>
+                </div>
+                <div className="panel-content">
+                  <div className="url-list">
+                    {urls.map(u => (
+                      <div key={u.id} className="url-row">
+                        <input
+                          className="url-input"
+                          value={u.value}
+                          onChange={e => updateUrl(u.id, e.target.value)}
+                          placeholder="github.com/owner/repo"
+                          onKeyDown={e => e.key === 'Enter' && explore()}
+                        />
+                        <button className="url-remove" onClick={() => removeUrl(u.id)}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="panel-section">
+                <div className="panel-header">Extract</div>
+                <div className="panel-content">
+                  <div className="filter-grid">
+                    {[
+                      { k: 'functions', i: 'ƒ', l: 'Functions' },
+                      { k: 'methods', i: 'λ', l: 'Methods' },
+                      { k: 'structs', i: 'S', l: 'Structs' },
+                      { k: 'interfaces', i: 'I', l: 'Interfaces' },
+                      { k: 'types', i: 'T', l: 'Types' },
+                      { k: 'constants', i: 'C', l: 'Constants' },
+                      { k: 'variables', i: 'V', l: 'Variables' }
+                    ].map(({ k, i, l }) => (
+                      <button
+                        key={k}
+                        className={`filter-btn ${filters[k] ? 'active' : ''}`}
+                        onClick={() => setFilters({ ...filters, [k]: !filters[k] })}
+                      >
+                        <div className={`filter-icon ${k.slice(0, -1)}`}>{i}</div>
+                        <span>{l}</span>
+                        <span className="filter-count">{counts[k] || 0}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="toggle-row">
+                    <div className={`toggle ${includeImpl ? 'on' : ''}`} onClick={() => setIncludeImpl(!includeImpl)} />
+                    <span>Include implementation</span>
+                  </div>
+                </div>
+              </div>
+              
+              {decls && (
+                <div className="panel-section" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <div className="panel-header">
+                    <span>Declarations ({totalFiltered})</span>
+                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                      <button className="btn btn-sm" onClick={expandAll}>⊞</button>
+                      <button className="btn btn-sm" onClick={collapseAll}>⊟</button>
+                      <button className="btn btn-sm" onClick={selectAll}>All</button>
+                      <button className="btn btn-sm" onClick={invert}>Inv</button>
+                      <button className="btn btn-sm" onClick={clearAll}>Clear</button>
+                    </div>
+                  </div>
+                  <div className="search-box">
+                    <input
+                      className="search-input"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Search name, file, receiver..."
+                    />
+                    <div className="search-hint">
+                      <span>{totalFiltered} items</span>
+                      <span><span className="kbd">Shift</span>+click for range</span>
+                    </div>
+                  </div>
+                  <div className="decl-list">
+                    {Object.entries(filtered).map(([kind, items]) => (
+                      <div key={kind} className="decl-group">
+                        <div className="decl-group-header" onClick={() => setExpanded({ ...expanded, [kind]: !expanded[kind] })}>
+                          <span className={`decl-arrow ${expanded[kind] ? 'open' : ''}`}>▶</span>
+                          <span>{kind}</span>
+                          <span style={{ marginLeft: 'auto' }}>{items.length}</span>
+                        </div>
+                        {expanded[kind] && items.map((item, idx) => {
+                          const key = `${item.kind}:${item.name}:${item.file}:${item.startLine}`;
+                          const isSel = selected.has(key);
+                          return (
+                            <div key={idx} className={`decl-item ${isSel ? 'selected' : ''}`} onClick={e => toggleItem(item, e)}>
+                              <span className="decl-check">✓</span>
+                              {item.receiver && <span className="decl-receiver">({item.receiver})</span>}
+                              <span className="decl-name">{item.name}</span>
+                              <span className="decl-file">{item.file.split('/').pop()}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {ctOps.length > 0 && (
+                <div className="ct-panel">
+                  <div className="ct-title">Category Theory</div>
+                  <div className="ct-ops">
+                    {['Functor', 'Applicative', 'Monoid', 'Foldable', 'Filterable'].map(op => (
+                      <span key={op} className={`ct-op ${ctOps.includes(op) ? 'active' : ''}`}>{op}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="right-panel">
+              {!decls ? (
+                <div className="empty-state">
+                  <div className="empty-icon">🔺</div>
+                  <div className="empty-title">Pure Go Prism</div>
+                  <div>Enter GitHub URLs and click Explore</div>
+                  <div style={{ marginTop: '0.5rem', fontSize: '11px' }}>
+                    {parserMode === 'wasm' ? '✅ WASM parser (go/ast) ready' : 
+                     parserMode === 'regex' ? '⚠️ Using regex fallback' : 
+                     '⏳ Loading WASM parser...'}
+                  </div>
+                </div>
+              ) : selected.size === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon">👈</div>
+                  <div className="empty-title">Select Declarations</div>
+                  <div>Click items on the left to build LLM context</div>
+                </div>
+              ) : (
+                <>
+                  <div className="code-header">
+                    <span className="code-title">Go Code</span>
+                    <span className="code-meta">
+                      {selected.size} items • {output.split('\n').length} lines • ~{Math.ceil(output.length / 4)} tokens
+                    </span>
+                    <div className="code-actions">
+                      <button className="btn btn-sm" onClick={copy}>📋 Copy</button>
+                    </div>
+                  </div>
+                  <div className="code-container">
+                    <pre className="code-block" dangerouslySetInnerHTML={{ __html: highlightedOutput }} />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          
+          {loading && progress && (
+            <div className="progress-overlay">
+              <div className="progress-card">
+                <div className="progress-title">🔺 Refracting Go Code</div>
+                <div className="progress-stage">{progress.message}</div>
+                {progress.detail && <div className="progress-detail">{progress.detail}</div>}
+                {progress.total && (
+                  <>
+                    <div className="progress-bar">
+                      <div className="progress-fill" style={{ width: `${(progress.current / progress.total) * 100}%` }} />
+                    </div>
+                    <div className="progress-count">{progress.current} / {progress.total}</div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {toast && <div className="toast">{toast}</div>}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

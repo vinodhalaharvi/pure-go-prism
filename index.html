@@ -103,6 +103,9 @@
     .btn:hover { background: var(--bg-3); border-color: var(--accent); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-primary { background: var(--go-blue); border-color: var(--go-blue); color: #fff; }
+    .btn-primary:hover { background: #00c4f0; }
+    .btn-claude { background: linear-gradient(135deg, var(--purple), var(--pink)); border: none; }
+    .btn-claude:hover { opacity: 0.9; }
     .btn-sm { padding: 0.3rem 0.6rem; font-size: 11px; }
     
     .main { display: flex; flex: 1; overflow: hidden; }
@@ -357,7 +360,7 @@
     
     .code-title { font-weight: 500; }
     .code-meta { font-size: 11px; color: var(--text-dim); }
-    .code-actions { margin-left: auto; }
+    .code-actions { margin-left: auto; display: flex; gap: 0.5rem; }
     
     .code-container { flex: 1; overflow: auto; }
     
@@ -369,7 +372,6 @@
       white-space: pre;
     }
     
-    /* Go Syntax Highlighting */
     .go-kw { color: #ff7b72; }
     .go-type { color: #79c0ff; }
     .go-str { color: #a5d6ff; }
@@ -446,6 +448,121 @@
       color: var(--red);
       font-size: 12px;
     }
+    
+    .tab-bar {
+      display: flex;
+      background: var(--bg-1);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .tab {
+      padding: 0.6rem 1rem;
+      font-size: 12px;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    
+    .llm-section {
+      border-top: 1px solid var(--border);
+      background: var(--bg-1);
+    }
+    
+    .llm-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg-2);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .llm-title { font-weight: 500; font-size: 12px; }
+    
+    .api-key-input {
+      flex: 1;
+      max-width: 220px;
+      padding: 0.4rem 0.6rem;
+      background: var(--bg-0);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 11px;
+      font-family: monospace;
+      margin-left: auto;
+    }
+    
+    .api-key-input:focus { border-color: var(--accent); outline: none; }
+    
+    .prompt-area { padding: 0.75rem 1rem; }
+    
+    .prompt-textarea {
+      width: 100%;
+      min-height: 70px;
+      padding: 0.6rem;
+      background: var(--bg-0);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 12px;
+      font-family: inherit;
+      resize: vertical;
+      outline: none;
+    }
+    
+    .prompt-textarea:focus { border-color: var(--accent); }
+    
+    .prompt-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.5rem;
+    }
+    
+    .prompt-hint { font-size: 10px; color: var(--text-dim); }
+    
+    .llm-thinking {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem;
+      color: var(--text-dim);
+      gap: 1rem;
+    }
+    
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid var(--border);
+      border-top-color: var(--purple);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .response-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg-2);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .response-badge {
+      padding: 0.2rem 0.5rem;
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      color: #fff;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
@@ -454,48 +571,32 @@
   <script type="text/babel">
     const { useState, useMemo, useEffect } = React;
 
-    // ============================================================
-    // WASM PARSER STATE
-    // ============================================================
-    
     let wasmReady = false;
-    let wasmError = null;
     
     async function loadWasm() {
       try {
         const go = new Go();
-        const result = await WebAssembly.instantiateStreaming(
-          fetch('parser.wasm'),
-          go.importObject
-        );
+        const result = await WebAssembly.instantiateStreaming(fetch('parser.wasm'), go.importObject);
         go.run(result.instance);
         wasmReady = true;
-        console.log('✅ WASM parser ready (go/ast + go/parser)');
+        console.log('✅ WASM parser ready');
         return true;
       } catch (e) {
-        wasmError = e.message;
-        console.error('❌ WASM failed to load:', e.message);
+        console.error('❌ WASM failed:', e.message);
         return false;
       }
     }
     
-    // Start loading immediately
     const wasmPromise = loadWasm();
 
-    // ============================================================
-    // CATEGORY THEORY LIBRARY
-    // ============================================================
-    
     const Result = {
       ok: (value) => ({ tag: 'ok', value }),
       err: (error) => ({ tag: 'err', error }),
       isOk: (r) => r.tag === 'ok'
     };
 
-    const Functor = {
-      Array: { fmap: (f, xs) => xs.map(f) }
-    };
-
+    const Functor = { Array: { fmap: (f, xs) => xs.map(f) } };
+    
     const Applicative = {
       Promise: {
         traverse: (f, xs) => Promise.all(xs.map(f)),
@@ -512,10 +613,7 @@
 
     const Monoid = {
       Declarations: {
-        empty: () => ({
-          functions: [], methods: [], structs: [], interfaces: [],
-          types: [], constants: [], variables: [], imports: []
-        }),
+        empty: () => ({ functions: [], methods: [], structs: [], interfaces: [], types: [], constants: [], variables: [], imports: [] }),
         concat: (a, b) => ({
           functions: [...a.functions, ...b.functions],
           methods: [...a.methods, ...b.methods],
@@ -529,149 +627,73 @@
       }
     };
 
-    const Foldable = {
-      Array: {
-        foldMap: (monoid, f, xs) => xs.reduce((acc, x) => monoid.concat(acc, f(x)), monoid.empty())
-      }
-    };
+    const Foldable = { Array: { foldMap: (monoid, f, xs) => xs.reduce((acc, x) => monoid.concat(acc, f(x)), monoid.empty()) } };
+    const Filterable = { Array: { filter: (p, xs) => xs.filter(p) } };
 
-    const Filterable = {
-      Array: { filter: (p, xs) => xs.filter(p) }
-    };
-
-    // ============================================================
-    // GO SYNTAX HIGHLIGHTER
-    // ============================================================
-    
     const GoHighlighter = {
       highlight: (code) => {
-        let html = code
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
-        
+        let html = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const tokens = [];
         let i = 0;
-        
         while (i < html.length) {
           if (html.slice(i, i + 2) === '/*') {
             const end = html.indexOf('*/', i + 2);
             const endIdx = end === -1 ? html.length : end + 2;
             tokens.push(`<span class="go-cmt">${html.slice(i, endIdx)}</span>`);
-            i = endIdx;
-            continue;
+            i = endIdx; continue;
           }
-          
           if (html.slice(i, i + 2) === '//') {
             const end = html.indexOf('\n', i);
             const endIdx = end === -1 ? html.length : end;
             tokens.push(`<span class="go-cmt">${html.slice(i, endIdx)}</span>`);
-            i = endIdx;
-            continue;
+            i = endIdx; continue;
           }
-          
           if (html[i] === '"') {
             let j = i + 1;
-            while (j < html.length && html[j] !== '"') {
-              if (html[j] === '\\') j++;
-              j++;
-            }
+            while (j < html.length && html[j] !== '"') { if (html[j] === '\\') j++; j++; }
             tokens.push(`<span class="go-str">${html.slice(i, j + 1)}</span>`);
-            i = j + 1;
-            continue;
+            i = j + 1; continue;
           }
-          
           if (html[i] === '`') {
             const end = html.indexOf('`', i + 1);
             const endIdx = end === -1 ? html.length : end + 1;
             tokens.push(`<span class="go-str">${html.slice(i, endIdx)}</span>`);
-            i = endIdx;
-            continue;
+            i = endIdx; continue;
           }
-          
           if (/[0-9]/.test(html[i]) && (i === 0 || /[\s\(\[{,=:+\-*/%<>!&|^]/.test(html[i-1]))) {
             let j = i;
             while (j < html.length && /[0-9.xXa-fA-FeE+\-]/.test(html[j])) j++;
             tokens.push(`<span class="go-num">${html.slice(i, j)}</span>`);
-            i = j;
-            continue;
+            i = j; continue;
           }
-          
           if (/[a-zA-Z_]/.test(html[i])) {
             let j = i;
             while (j < html.length && /[a-zA-Z0-9_]/.test(html[j])) j++;
             const word = html.slice(i, j);
-            
-            const keywords = ['func', 'type', 'struct', 'interface', 'const', 'var', 'package', 'import',
-                             'return', 'if', 'else', 'for', 'range', 'switch', 'case', 'default', 'break',
-                             'continue', 'go', 'defer', 'select', 'chan', 'map', 'make', 'new', 'nil',
-                             'true', 'false', 'iota', 'fallthrough', 'goto'];
-            
-            const types = ['string', 'int', 'int8', 'int16', 'int32', 'int64', 'uint', 'uint8', 'uint16',
-                          'uint32', 'uint64', 'float32', 'float64', 'complex64', 'complex128',
-                          'bool', 'byte', 'rune', 'error', 'any', 'uintptr'];
-            
+            const keywords = ['func','type','struct','interface','const','var','package','import','return','if','else','for','range','switch','case','default','break','continue','go','defer','select','chan','map','make','new','nil','true','false','iota','fallthrough','goto'];
+            const types = ['string','int','int8','int16','int32','int64','uint','uint8','uint16','uint32','uint64','float32','float64','complex64','complex128','bool','byte','rune','error','any','uintptr'];
             const nextChar = html[j] || '';
-            
-            if (keywords.includes(word)) {
-              tokens.push(`<span class="go-kw">${word}</span>`);
-            } else if (types.includes(word)) {
-              tokens.push(`<span class="go-type">${word}</span>`);
-            } else if (nextChar === '(') {
-              tokens.push(`<span class="go-fn">${word}</span>`);
-            } else if (word[0] === word[0].toUpperCase() && /[a-zA-Z]/.test(word[0])) {
-              tokens.push(`<span class="go-type">${word}</span>`);
-            } else {
-              tokens.push(word);
-            }
-            i = j;
-            continue;
+            if (keywords.includes(word)) tokens.push(`<span class="go-kw">${word}</span>`);
+            else if (types.includes(word)) tokens.push(`<span class="go-type">${word}</span>`);
+            else if (nextChar === '(') tokens.push(`<span class="go-fn">${word}</span>`);
+            else if (word[0] === word[0].toUpperCase() && /[a-zA-Z]/.test(word[0])) tokens.push(`<span class="go-type">${word}</span>`);
+            else tokens.push(word);
+            i = j; continue;
           }
-          
-          tokens.push(html[i]);
-          i++;
+          tokens.push(html[i]); i++;
         }
-        
         return tokens.join('');
       }
     };
 
-    // ============================================================
-    // GO PARSER (WASM - uses go/ast + go/parser)
-    // ============================================================
-    
     const GoParser = {
       parse: (source, filePath, repo) => {
-        if (!wasmReady) {
-          console.error('WASM not ready');
-          return Monoid.Declarations.empty();
-        }
-        
+        if (!wasmReady) return Monoid.Declarations.empty();
         const result = parseGoSource(source, filePath);
-        
-        if (result.error) {
-          console.warn('Parse error:', result.error, filePath);
-          return Monoid.Declarations.empty();
-        }
-        
+        if (result.error) return Monoid.Declarations.empty();
         const decls = Monoid.Declarations.empty();
-        
         for (const d of result.declarations || []) {
-          const decl = {
-            kind: d.kind,
-            name: d.name,
-            source: d.source,
-            signature: d.signature || d.source,
-            doc: d.doc,
-            file: filePath,
-            repo: repo,
-            startLine: d.startLine,
-            endLine: d.endLine,
-            exported: d.exported,
-            hasBody: d.source && d.source.includes('{'),
-            receiver: d.receiver
-          };
-          
+          const decl = { kind: d.kind, name: d.name, source: d.source, signature: d.signature || d.source, doc: d.doc, file: filePath, repo, startLine: d.startLine, endLine: d.endLine, exported: d.exported, hasBody: d.source?.includes('{'), receiver: d.receiver };
           switch (d.kind) {
             case 'function': decls.functions.push(decl); break;
             case 'method': decls.methods.push(decl); break;
@@ -682,12 +704,9 @@
             case 'var': decls.variables.push(decl); break;
           }
         }
-        
         return decls;
       },
-      
       getSignatureOnly: (decl) => {
-        // WASM gives us signature directly
         if (decl.signature && decl.signature !== decl.source) {
           const lines = [];
           if (decl.doc) lines.push('// ' + decl.doc.split('\n').join('\n// '));
@@ -698,30 +717,53 @@
       }
     };
 
-    // ============================================================
-    // GITHUB API
-    // ============================================================
-    
+    const ClaudeAPI = {
+      call: async (apiKey, prompt, goCode) => {
+        const systemPrompt = `You are an expert Go developer. The user will provide Go code (types, interfaces, function signatures) and a request.
+
+IMPORTANT: Always respond with valid Go code. Wrap your Go code in \`\`\`go code blocks. Be concise and focus on generating clean, idiomatic Go code.`;
+        const userMessage = `Here is the Go code context:\n\n\`\`\`go\n${goCode}\n\`\`\`\n\n${prompt}`;
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4096, system: systemPrompt, messages: [{ role: 'user', content: userMessage }] })
+        });
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error?.message || `API error: ${response.status}`);
+        }
+        const data = await response.json();
+        return data.content[0].text;
+      },
+      extractGoCode: (response) => {
+        const blocks = [];
+        const regex = /```go\n([\s\S]*?)```/g;
+        let match;
+        while ((match = regex.exec(response)) !== null) blocks.push(match[1].trim());
+        return blocks.length > 0 ? blocks.join('\n\n') : response;
+      }
+    };
+
     const GitHub = {
       parseUrl: (url) => {
         const m = url.match(/github\.com\/([^\/]+)\/([^\/\s]+)/);
         if (!m) return null;
         return { owner: m[1], repo: m[2].replace(/\.git$/, ''), branch: 'main' };
       },
-      
       fetchTree: async (owner, repo) => {
         for (const branch of ['main', 'master']) {
           try {
             const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`);
-            if (res.ok) {
-              const data = await res.json();
-              return { ...data, branch };
-            }
-          } catch (e) { /* try next */ }
+            if (res.ok) { const data = await res.json(); return { ...data, branch }; }
+          } catch (e) {}
         }
         throw new Error(`Failed to fetch ${owner}/${repo}`);
       },
-      
       fetchFile: async (owner, repo, branch, path) => {
         const res = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`);
         if (!res.ok) throw new Error(`Failed: ${path}`);
@@ -729,54 +771,29 @@
       }
     };
 
-    // ============================================================
-    // PIPELINE
-    // ============================================================
-    
     const Pipeline = {
       run: async (urls, onProgress) => {
         const ctOps = new Set();
-        
-        // Wait for WASM to finish loading
         const wasmOk = await wasmPromise;
-        if (!wasmOk) {
-          return Result.err('WASM parser failed to load. Check browser console.');
-        }
-        
+        if (!wasmOk) return Result.err('WASM parser failed');
         const parsed = urls.map(u => ({ url: u, parsed: GitHub.parseUrl(u) })).filter(x => x.parsed);
         if (!parsed.length) return Result.err('No valid GitHub URLs');
-        
         onProgress({ stage: 'trees', message: 'Fetching repos...' });
         ctOps.add('Applicative');
-        
         const trees = await Applicative.Promise.traverse(async ({ url, parsed }) => {
-          try {
-            const tree = await GitHub.fetchTree(parsed.owner, parsed.repo);
-            return Result.ok({ url, parsed, tree, branch: tree.branch });
-          } catch (e) {
-            return Result.err({ url, error: e.message });
-          }
+          try { const tree = await GitHub.fetchTree(parsed.owner, parsed.repo); return Result.ok({ url, parsed, tree, branch: tree.branch }); }
+          catch (e) { return Result.err({ url, error: e.message }); }
         }, parsed);
-        
         const okTrees = trees.filter(Result.isOk).map(r => r.value);
         if (!okTrees.length) return Result.err('Failed to fetch repos');
-        
         ctOps.add('Filterable');
         const allFiles = [];
         for (const { parsed, tree, branch } of okTrees) {
-          const goFiles = Filterable.Array.filter(
-            f => f.type === 'blob' && f.path.endsWith('.go') && !f.path.includes('vendor/') && !f.path.includes('_test.go'),
-            tree.tree || []
-          );
-          for (const f of goFiles) {
-            allFiles.push({ ...f, owner: parsed.owner, repo: parsed.repo, branch });
-          }
+          const goFiles = Filterable.Array.filter(f => f.type === 'blob' && f.path.endsWith('.go') && !f.path.includes('vendor/') && !f.path.includes('_test.go'), tree.tree || []);
+          for (const f of goFiles) allFiles.push({ ...f, owner: parsed.owner, repo: parsed.repo, branch });
         }
-        
         if (!allFiles.length) return Result.err('No Go files found');
-        
         onProgress({ stage: 'fetch', message: `Fetching ${allFiles.length} files...`, total: allFiles.length, current: 0 });
-        
         let count = 0;
         const contents = await Applicative.Promise.traverseN(10, async (f) => {
           try {
@@ -784,32 +801,20 @@
             count++;
             onProgress({ stage: 'fetch', message: 'Fetching...', detail: f.path, total: allFiles.length, current: count });
             return Result.ok({ ...f, content });
-          } catch (e) {
-            count++;
-            return Result.err(e.message);
-          }
+          } catch (e) { count++; return Result.err(e.message); }
         }, allFiles);
-        
         const okContents = contents.filter(Result.isOk).map(r => r.value);
-        
         ctOps.add('Functor');
         onProgress({ stage: 'parse', message: 'Parsing with go/ast...' });
         const parsedDecls = Functor.Array.fmap(f => GoParser.parse(f.content, f.path, `${f.owner}/${f.repo}`), okContents);
-        
-        ctOps.add('Foldable');
-        ctOps.add('Monoid');
+        ctOps.add('Foldable'); ctOps.add('Monoid');
         const all = Foldable.Array.foldMap(Monoid.Declarations, d => d, parsedDecls);
         all.meta = { repos: okTrees.map(t => `${t.parsed.owner}/${t.parsed.repo}`), fileCount: okContents.length };
-        
         onProgress({ stage: 'done', message: 'Done!' });
         return Result.ok({ declarations: all, ctOps: [...ctOps] });
       }
     };
 
-    // ============================================================
-    // APP
-    // ============================================================
-    
     function App() {
       const [urls, setUrls] = useState([{ id: 1, value: 'https://github.com/gin-gonic/gin' }]);
       const [decls, setDecls] = useState(null);
@@ -825,10 +830,24 @@
       const [ctOps, setCtOps] = useState([]);
       const [lastKey, setLastKey] = useState(null);
       const [wasmStatus, setWasmStatus] = useState('loading');
+      const [apiKey, setApiKey] = useState(() => localStorage.getItem('claude_api_key') || '');
+      const [prompt, setPrompt] = useState('Implement the function bodies based on the signatures and types provided. Add helpful comments.');
+      const [llmResponse, setLlmResponse] = useState('');
+      const [llmLoading, setLlmLoading] = useState(false);
+      const [activeTab, setActiveTab] = useState('selection');
       
-      useEffect(() => {
-        wasmPromise.then(ok => setWasmStatus(ok ? 'ready' : 'error'));
-      }, []);
+      useEffect(() => { wasmPromise.then(ok => setWasmStatus(ok ? 'ready' : 'error')); }, []);
+      
+      const updateApiKey = (key) => { setApiKey(key); if (key) localStorage.setItem('claude_api_key', key); else localStorage.removeItem('claude_api_key'); };
+      
+      const sendToClaude = async () => {
+        if (!apiKey) { setToast('⚠️ Enter API key'); setTimeout(() => setToast(null), 3000); return; }
+        if (!output) { setToast('⚠️ Select code first'); setTimeout(() => setToast(null), 3000); return; }
+        setLlmLoading(true); setActiveTab('response'); setLlmResponse('');
+        try { const response = await ClaudeAPI.call(apiKey, prompt, output); setLlmResponse(response); }
+        catch (e) { setLlmResponse(`Error: ${e.message}`); }
+        finally { setLlmLoading(false); }
+      };
       
       const addUrl = () => setUrls([...urls, { id: Date.now(), value: '' }]);
       const removeUrl = (id) => urls.length > 1 && setUrls(urls.filter(u => u.id !== id));
@@ -837,39 +856,16 @@
       const explore = async () => {
         const valid = urls.filter(u => u.value.trim()).map(u => u.value.trim());
         if (!valid.length) { setError('Enter at least one URL'); return; }
-        
-        setLoading(true);
-        setError(null);
-        setDecls(null);
-        setSelected(new Set());
-        
-        const result = await Pipeline.run(valid, p => {
-          setProgress(p);
-        });
-        
-        setLoading(false);
-        setProgress(null);
-        
-        if (Result.isOk(result)) {
-          setDecls(result.value.declarations);
-          setCtOps(result.value.ctOps);
-          setExpanded({ functions: true });
-        } else {
-          setError(result.error);
-        }
+        setLoading(true); setError(null); setDecls(null); setSelected(new Set()); setLlmResponse(''); setActiveTab('selection');
+        const result = await Pipeline.run(valid, p => setProgress(p));
+        setLoading(false); setProgress(null);
+        if (Result.isOk(result)) { setDecls(result.value.declarations); setCtOps(result.value.ctOps); setExpanded({ functions: true }); }
+        else setError(result.error);
       };
       
       const counts = useMemo(() => {
         if (!decls) return {};
-        return {
-          functions: decls.functions.length,
-          methods: decls.methods.length,
-          structs: decls.structs.length,
-          interfaces: decls.interfaces.length,
-          types: decls.types.length,
-          constants: decls.constants.length,
-          variables: decls.variables.length
-        };
+        return { functions: decls.functions.length, methods: decls.methods.length, structs: decls.structs.length, interfaces: decls.interfaces.length, types: decls.types.length, constants: decls.constants.length, variables: decls.variables.length };
       }, [decls]);
       
       const filtered = useMemo(() => {
@@ -888,9 +884,7 @@
       const flatItems = useMemo(() => {
         const items = [];
         for (const [kind, list] of Object.entries(filtered)) {
-          for (const item of list) {
-            items.push({ key: `${item.kind}:${item.name}:${item.file}:${item.startLine}`, item });
-          }
+          for (const item of list) items.push({ key: `${item.kind}:${item.name}:${item.file}:${item.startLine}`, item });
         }
         return items;
       }, [filtered]);
@@ -900,24 +894,17 @@
       const toggleItem = (item, e) => {
         const key = `${item.kind}:${item.name}:${item.file}:${item.startLine}`;
         const next = new Set(selected);
-        
-        if (e && e.shiftKey && lastKey) {
+        if (e?.shiftKey && lastKey) {
           const lastIdx = flatItems.findIndex(f => f.key === lastKey);
           const currIdx = flatItems.findIndex(f => f.key === key);
           if (lastIdx !== -1 && currIdx !== -1) {
-            const start = Math.min(lastIdx, currIdx);
-            const end = Math.max(lastIdx, currIdx);
+            const start = Math.min(lastIdx, currIdx), end = Math.max(lastIdx, currIdx);
             for (let i = start; i <= end; i++) next.add(flatItems[i].key);
-            setSelected(next);
-            setLastKey(key);
-            return;
+            setSelected(next); setLastKey(key); return;
           }
         }
-        
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-        setSelected(next);
-        setLastKey(key);
+        if (next.has(key)) next.delete(key); else next.add(key);
+        setSelected(next); setLastKey(key);
       };
       
       const selectAll = () => { const s = new Set(); flatItems.forEach(f => s.add(f.key)); setSelected(s); };
@@ -936,31 +923,22 @@
           if (!byRepo[repo][d.file]) byRepo[repo][d.file] = [];
           byRepo[repo][d.file].push(d);
         }
-        
         const lines = [];
         for (const [repo, files] of Object.entries(byRepo)) {
           lines.push(`// ===== Repository: ${repo} =====\n`);
           for (const [file, ds] of Object.entries(files)) {
             lines.push(`// ----- File: ${file} -----\n`);
-            for (const d of ds) {
-              lines.push(includeImpl ? d.source : GoParser.getSignatureOnly(d));
-              lines.push('');
-            }
+            for (const d of ds) { lines.push(includeImpl ? d.source : GoParser.getSignatureOnly(d)); lines.push(''); }
           }
         }
         return lines.join('\n');
       }, [selected, flatItems, includeImpl]);
       
-      const highlightedOutput = useMemo(() => {
-        if (!output) return '';
-        return GoHighlighter.highlight(output);
-      }, [output]);
+      const highlightedOutput = useMemo(() => output ? GoHighlighter.highlight(output) : '', [output]);
+      const extractedGoCode = useMemo(() => llmResponse ? ClaudeAPI.extractGoCode(llmResponse) : '', [llmResponse]);
+      const highlightedResponse = useMemo(() => extractedGoCode ? GoHighlighter.highlight(extractedGoCode) : '', [extractedGoCode]);
       
-      const copy = () => {
-        navigator.clipboard.writeText(output);
-        setToast('Copied!');
-        setTimeout(() => setToast(null), 2000);
-      };
+      const copy = (text) => { navigator.clipboard.writeText(text || output); setToast('✓ Copied!'); setTimeout(() => setToast(null), 2000); };
       
       return (
         <div className="app">
@@ -996,13 +974,7 @@
                   <div className="url-list">
                     {urls.map(u => (
                       <div key={u.id} className="url-row">
-                        <input
-                          className="url-input"
-                          value={u.value}
-                          onChange={e => updateUrl(u.id, e.target.value)}
-                          placeholder="github.com/owner/repo"
-                          onKeyDown={e => e.key === 'Enter' && explore()}
-                        />
+                        <input className="url-input" value={u.value} onChange={e => updateUrl(u.id, e.target.value)} placeholder="github.com/owner/repo" onKeyDown={e => e.key === 'Enter' && explore()} />
                         <button className="url-remove" onClick={() => removeUrl(u.id)}>×</button>
                       </div>
                     ))}
@@ -1014,21 +986,9 @@
                 <div className="panel-header">Extract</div>
                 <div className="panel-content">
                   <div className="filter-grid">
-                    {[
-                      { k: 'functions', i: 'ƒ', l: 'Functions' },
-                      { k: 'methods', i: 'λ', l: 'Methods' },
-                      { k: 'structs', i: 'S', l: 'Structs' },
-                      { k: 'interfaces', i: 'I', l: 'Interfaces' },
-                      { k: 'types', i: 'T', l: 'Types' },
-                      { k: 'constants', i: 'C', l: 'Constants' },
-                      { k: 'variables', i: 'V', l: 'Variables' }
-                    ].map(({ k, i, l }) => (
-                      <button
-                        key={k}
-                        className={`filter-btn ${filters[k] ? 'active' : ''}`}
-                        onClick={() => setFilters({ ...filters, [k]: !filters[k] })}
-                      >
-                        <div className={`filter-icon ${k.slice(0, -1)}`}>{i}</div>
+                    {[{k:'functions',i:'ƒ',l:'Functions'},{k:'methods',i:'λ',l:'Methods'},{k:'structs',i:'S',l:'Structs'},{k:'interfaces',i:'I',l:'Interfaces'},{k:'types',i:'T',l:'Types'},{k:'constants',i:'C',l:'Constants'},{k:'variables',i:'V',l:'Variables'}].map(({k,i,l}) => (
+                      <button key={k} className={`filter-btn ${filters[k] ? 'active' : ''}`} onClick={() => setFilters({...filters,[k]:!filters[k]})}>
+                        <div className={`filter-icon ${k.slice(0,-1)}`}>{i}</div>
                         <span>{l}</span>
                         <span className="filter-count">{counts[k] || 0}</span>
                       </button>
@@ -1042,10 +1002,10 @@
               </div>
               
               {decls && (
-                <div className="panel-section" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div className="panel-section" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
                   <div className="panel-header">
                     <span>Declarations ({totalFiltered})</span>
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <div style={{display:'flex',gap:'0.25rem'}}>
                       <button className="btn btn-sm" onClick={expandAll}>⊞</button>
                       <button className="btn btn-sm" onClick={collapseAll}>⊟</button>
                       <button className="btn btn-sm" onClick={selectAll}>All</button>
@@ -1054,12 +1014,7 @@
                     </div>
                   </div>
                   <div className="search-box">
-                    <input
-                      className="search-input"
-                      value={search}
-                      onChange={e => setSearch(e.target.value)}
-                      placeholder="Search name, file, receiver..."
-                    />
+                    <input className="search-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, file, receiver..." />
                     <div className="search-hint">
                       <span>{totalFiltered} items</span>
                       <span><span className="kbd">Shift</span>+click for range</span>
@@ -1068,16 +1023,15 @@
                   <div className="decl-list">
                     {Object.entries(filtered).map(([kind, items]) => (
                       <div key={kind} className="decl-group">
-                        <div className="decl-group-header" onClick={() => setExpanded({ ...expanded, [kind]: !expanded[kind] })}>
+                        <div className="decl-group-header" onClick={() => setExpanded({...expanded,[kind]:!expanded[kind]})}>
                           <span className={`decl-arrow ${expanded[kind] ? 'open' : ''}`}>▶</span>
                           <span>{kind}</span>
-                          <span style={{ marginLeft: 'auto' }}>{items.length}</span>
+                          <span style={{marginLeft:'auto'}}>{items.length}</span>
                         </div>
                         {expanded[kind] && items.map((item, idx) => {
                           const key = `${item.kind}:${item.name}:${item.file}:${item.startLine}`;
-                          const isSel = selected.has(key);
                           return (
-                            <div key={idx} className={`decl-item ${isSel ? 'selected' : ''}`} onClick={e => toggleItem(item, e)}>
+                            <div key={idx} className={`decl-item ${selected.has(key) ? 'selected' : ''}`} onClick={e => toggleItem(item, e)}>
                               <span className="decl-check">✓</span>
                               {item.receiver && <span className="decl-receiver">({item.receiver})</span>}
                               <span className="decl-name">{item.name}</span>
@@ -1095,7 +1049,7 @@
                 <div className="ct-panel">
                   <div className="ct-title">Category Theory</div>
                   <div className="ct-ops">
-                    {['Functor', 'Applicative', 'Monoid', 'Foldable', 'Filterable'].map(op => (
+                    {['Functor','Applicative','Monoid','Foldable','Filterable'].map(op => (
                       <span key={op} className={`ct-op ${ctOps.includes(op) ? 'active' : ''}`}>{op}</span>
                     ))}
                   </div>
@@ -1109,10 +1063,8 @@
                   <div className="empty-icon">🔺</div>
                   <div className="empty-title">Pure Go Prism</div>
                   <div>Enter GitHub URLs and click Explore</div>
-                  <div style={{ marginTop: '0.5rem', fontSize: '11px' }}>
-                    {wasmStatus === 'ready' ? '✅ WASM parser (go/ast) ready' : 
-                     wasmStatus === 'error' ? '❌ WASM failed to load - check console' : 
-                     '⏳ Loading WASM parser...'}
+                  <div style={{marginTop:'0.5rem',fontSize:'11px'}}>
+                    {wasmStatus === 'ready' ? '✅ WASM parser ready' : wasmStatus === 'error' ? '❌ WASM failed' : '⏳ Loading...'}
                   </div>
                 </div>
               ) : selected.size === 0 ? (
@@ -1125,16 +1077,69 @@
                 <>
                   <div className="code-header">
                     <span className="code-title">Go Code</span>
-                    <span className="code-meta">
-                      {selected.size} items • {output.split('\n').length} lines • ~{Math.ceil(output.length / 4)} tokens
-                    </span>
+                    <span className="code-meta">{selected.size} items • ~{Math.ceil(output.length / 4)} tokens</span>
                     <div className="code-actions">
-                      <button className="btn btn-sm" onClick={copy}>📋 Copy</button>
+                      <button className="btn btn-sm" onClick={() => copy()}>📋 Copy</button>
                     </div>
                   </div>
-                  <div className="code-container">
-                    <pre className="code-block" dangerouslySetInnerHTML={{ __html: highlightedOutput }} />
+                  
+                  <div className="tab-bar">
+                    <div className={`tab ${activeTab === 'selection' ? 'active' : ''}`} onClick={() => setActiveTab('selection')}>📄 Selection</div>
+                    <div className={`tab ${activeTab === 'response' ? 'active' : ''}`} onClick={() => setActiveTab('response')}>🤖 Claude {llmResponse && '•'}</div>
                   </div>
+                  
+                  {activeTab === 'selection' && (
+                    <>
+                      <div className="code-container" style={{flex:1}}>
+                        <pre className="code-block" dangerouslySetInnerHTML={{__html: highlightedOutput}} />
+                      </div>
+                      <div className="llm-section">
+                        <div className="llm-header">
+                          <span className="llm-title">🧠 Claude</span>
+                          <input type="password" className="api-key-input" placeholder="sk-ant-api... (API Key)" value={apiKey} onChange={e => updateApiKey(e.target.value)} />
+                        </div>
+                        <div className="prompt-area">
+                          <textarea className="prompt-textarea" value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Enter your prompt..." />
+                          <div className="prompt-actions">
+                            <span className="prompt-hint">Selected code + prompt → Claude</span>
+                            <button className="btn btn-claude" onClick={sendToClaude} disabled={llmLoading || !apiKey}>
+                              {llmLoading ? '⏳ Thinking...' : '🚀 Send to Claude'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  
+                  {activeTab === 'response' && (
+                    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+                      {llmLoading ? (
+                        <div className="llm-thinking">
+                          <div className="spinner"></div>
+                          <span>Claude is thinking...</span>
+                        </div>
+                      ) : llmResponse ? (
+                        <>
+                          <div className="response-header">
+                            <span className="response-badge">Claude</span>
+                            <span style={{fontSize:'11px',color:'var(--text-dim)'}}>Generated Go Code</span>
+                            <div style={{marginLeft:'auto'}}>
+                              <button className="btn btn-sm" onClick={() => copy(extractedGoCode)}>📋 Copy Code</button>
+                            </div>
+                          </div>
+                          <div className="code-container" style={{flex:1}}>
+                            <pre className="code-block" dangerouslySetInnerHTML={{__html: highlightedResponse}} />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="empty-state">
+                          <div className="empty-icon">🤖</div>
+                          <div className="empty-title">No Response Yet</div>
+                          <div>Send your selection to Claude</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -1148,9 +1153,7 @@
                 {progress.detail && <div className="progress-detail">{progress.detail}</div>}
                 {progress.total && (
                   <>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${(progress.current / progress.total) * 100}%` }} />
-                    </div>
+                    <div className="progress-bar"><div className="progress-fill" style={{width:`${(progress.current/progress.total)*100}%`}} /></div>
                     <div className="progress-count">{progress.current} / {progress.total}</div>
                   </>
                 )}

@@ -1045,16 +1045,6 @@ IMPORTANT: Always respond with valid Go code. Wrap your Go code in \`\`\`go code
                 </div>
               )}
               
-              {ctOps.length > 0 && (
-                <div className="ct-panel">
-                  <div className="ct-title">Category Theory</div>
-                  <div className="ct-ops">
-                    {['Functor','Applicative','Monoid','Foldable','Filterable'].map(op => (
-                      <span key={op} className={`ct-op ${ctOps.includes(op) ? 'active' : ''}`}>{op}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
             
             <div className="right-panel">

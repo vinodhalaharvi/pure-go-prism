@@ -75,7 +75,6 @@
     }
     
     .tag.wasm { background: var(--green); }
-    .tag.regex { background: var(--yellow); color: #000; }
     
     .header-stats {
       display: flex;
@@ -460,7 +459,7 @@
     // ============================================================
     
     let wasmReady = false;
-    let wasmLoading = true;
+    let wasmError = null;
     
     async function loadWasm() {
       try {
@@ -471,12 +470,11 @@
         );
         go.run(result.instance);
         wasmReady = true;
-        wasmLoading = false;
         console.log('✅ WASM parser ready (go/ast + go/parser)');
         return true;
       } catch (e) {
-        wasmLoading = false;
-        console.warn('⚠️ WASM failed, using regex fallback:', e.message);
+        wasmError = e.message;
+        console.error('❌ WASM failed to load:', e.message);
         return false;
       }
     }
@@ -639,200 +637,50 @@
     };
 
     // ============================================================
-    // GO PARSER (WASM with regex fallback)
+    // GO PARSER (WASM - uses go/ast + go/parser)
     // ============================================================
     
     const GoParser = {
       parse: (source, filePath, repo) => {
-        if (wasmReady && typeof parseGoSource === 'function') {
-          return GoParser.parseWasm(source, filePath, repo);
+        if (!wasmReady) {
+          console.error('WASM not ready');
+          return Monoid.Declarations.empty();
         }
-        return GoParser.parseRegex(source, filePath, repo);
-      },
-      
-      parseWasm: (source, filePath, repo) => {
-        try {
-          const result = parseGoSource(source, filePath);
-          
-          if (result.error) {
-            console.warn('WASM parse error:', result.error);
-            return GoParser.parseRegex(source, filePath, repo);
-          }
-          
-          const decls = Monoid.Declarations.empty();
-          
-          for (const d of result.declarations || []) {
-            const decl = {
-              kind: d.kind,
-              name: d.name,
-              source: d.source,
-              signature: d.signature || d.source,
-              doc: d.doc,
-              file: filePath,
-              repo: repo,
-              startLine: d.startLine,
-              endLine: d.endLine,
-              exported: d.exported,
-              hasBody: d.source && d.source.includes('{'),
-              receiver: d.receiver
-            };
-            
-            switch (d.kind) {
-              case 'function': decls.functions.push(decl); break;
-              case 'method': decls.methods.push(decl); break;
-              case 'struct': decls.structs.push(decl); break;
-              case 'interface': decls.interfaces.push(decl); break;
-              case 'type': decls.types.push(decl); break;
-              case 'const': decls.constants.push(decl); break;
-              case 'var': decls.variables.push(decl); break;
-            }
-          }
-          
-          return decls;
-        } catch (e) {
-          console.warn('WASM error:', e);
-          return GoParser.parseRegex(source, filePath, repo);
+        
+        const result = parseGoSource(source, filePath);
+        
+        if (result.error) {
+          console.warn('Parse error:', result.error, filePath);
+          return Monoid.Declarations.empty();
         }
-      },
-      
-      parseRegex: (source, filePath, repo) => {
+        
         const decls = Monoid.Declarations.empty();
-        const lines = source.split('\n');
-        let i = 0;
         
-        const collectBlock = (start) => {
-          let depth = 0, started = false;
-          const block = [];
-          for (let j = start; j < lines.length; j++) {
-            block.push(lines[j]);
-            for (const c of lines[j]) {
-              if (c === '{') { depth++; started = true; }
-              if (c === '}') depth--;
-            }
-            if (started && depth === 0) return { source: block.join('\n'), end: j };
-          }
-          return { source: block.join('\n'), end: start + block.length - 1 };
-        };
-        
-        const collectComments = (before) => {
-          const cmts = [];
-          let j = before - 1;
-          while (j >= 0 && lines[j].trim().startsWith('//')) {
-            cmts.unshift(lines[j]);
-            j--;
-          }
-          return cmts.join('\n');
-        };
-        
-        while (i < lines.length) {
-          const line = lines[i];
-          const trim = line.trim();
+        for (const d of result.declarations || []) {
+          const decl = {
+            kind: d.kind,
+            name: d.name,
+            source: d.source,
+            signature: d.signature || d.source,
+            doc: d.doc,
+            file: filePath,
+            repo: repo,
+            startLine: d.startLine,
+            endLine: d.endLine,
+            exported: d.exported,
+            hasBody: d.source && d.source.includes('{'),
+            receiver: d.receiver
+          };
           
-          if (!trim || trim.startsWith('//') || trim.startsWith('package ')) { i++; continue; }
-          
-          if (trim.startsWith('import ')) {
-            if (trim.includes('(')) {
-              const { source, end } = collectBlock(i);
-              decls.imports.push({ kind: 'import', name: 'imports', source, file: filePath, repo, startLine: i + 1 });
-              i = end + 1;
-            } else {
-              decls.imports.push({ kind: 'import', name: trim, source: line, file: filePath, repo, startLine: i + 1 });
-              i++;
-            }
-            continue;
+          switch (d.kind) {
+            case 'function': decls.functions.push(decl); break;
+            case 'method': decls.methods.push(decl); break;
+            case 'struct': decls.structs.push(decl); break;
+            case 'interface': decls.interfaces.push(decl); break;
+            case 'type': decls.types.push(decl); break;
+            case 'const': decls.constants.push(decl); break;
+            case 'var': decls.variables.push(decl); break;
           }
-          
-          const funcMatch = trim.match(/^func\s+([A-Za-z_]\w*)\s*(?:\[.*?\])?\s*\(/);
-          if (funcMatch && !trim.match(/^func\s*\(/)) {
-            const comments = collectComments(i);
-            const { source, end } = collectBlock(i);
-            const fullSrc = comments ? comments + '\n' + source : source;
-            const sig = source.match(/^func[^{]+/)?.[0]?.trim() || trim;
-            decls.functions.push({ kind: 'function', name: funcMatch[1], signature: sig, source: fullSrc, file: filePath, repo, startLine: i + 1, hasBody: source.includes('{') });
-            i = end + 1;
-            continue;
-          }
-          
-          const methodMatch = trim.match(/^func\s*\(\s*(\w+)\s+(\*?\w+)\s*\)\s*(\w+)\s*(?:\[.*?\])?\s*\(/);
-          if (methodMatch) {
-            const comments = collectComments(i);
-            const { source, end } = collectBlock(i);
-            const fullSrc = comments ? comments + '\n' + source : source;
-            const sig = source.match(/^func\s*\([^)]+\)[^{]+/)?.[0]?.trim() || trim;
-            decls.methods.push({ kind: 'method', name: methodMatch[3], receiver: methodMatch[2], signature: sig, source: fullSrc, file: filePath, repo, startLine: i + 1, hasBody: source.includes('{') });
-            i = end + 1;
-            continue;
-          }
-          
-          const structMatch = trim.match(/^type\s+(\w+)\s*(?:\[.*?\])?\s+struct\b/);
-          if (structMatch) {
-            const comments = collectComments(i);
-            const { source, end } = collectBlock(i);
-            const fullSrc = comments ? comments + '\n' + source : source;
-            decls.structs.push({ kind: 'struct', name: structMatch[1], source: fullSrc, file: filePath, repo, startLine: i + 1 });
-            i = end + 1;
-            continue;
-          }
-          
-          const ifaceMatch = trim.match(/^type\s+(\w+)\s*(?:\[.*?\])?\s+interface\b/);
-          if (ifaceMatch) {
-            const comments = collectComments(i);
-            const { source, end } = collectBlock(i);
-            const fullSrc = comments ? comments + '\n' + source : source;
-            decls.interfaces.push({ kind: 'interface', name: ifaceMatch[1], source: fullSrc, file: filePath, repo, startLine: i + 1 });
-            i = end + 1;
-            continue;
-          }
-          
-          const typeMatch = trim.match(/^type\s+(\w+)\s/);
-          if (typeMatch && !structMatch && !ifaceMatch) {
-            const comments = collectComments(i);
-            if (trim.includes('{')) {
-              const { source, end } = collectBlock(i);
-              const fullSrc = comments ? comments + '\n' + source : source;
-              decls.types.push({ kind: 'type', name: typeMatch[1], source: fullSrc, file: filePath, repo, startLine: i + 1 });
-              i = end + 1;
-            } else {
-              const fullSrc = comments ? comments + '\n' + line : line;
-              decls.types.push({ kind: 'type', name: typeMatch[1], source: fullSrc, file: filePath, repo, startLine: i + 1 });
-              i++;
-            }
-            continue;
-          }
-          
-          if (trim.startsWith('const ')) {
-            const comments = collectComments(i);
-            if (trim.includes('(')) {
-              const { source, end } = collectBlock(i);
-              const fullSrc = comments ? comments + '\n' + source : source;
-              decls.constants.push({ kind: 'const', name: 'const block', source: fullSrc, file: filePath, repo, startLine: i + 1 });
-              i = end + 1;
-            } else {
-              const m = trim.match(/^const\s+(\w+)/);
-              const fullSrc = comments ? comments + '\n' + line : line;
-              decls.constants.push({ kind: 'const', name: m?.[1] || 'const', source: fullSrc, file: filePath, repo, startLine: i + 1 });
-              i++;
-            }
-            continue;
-          }
-          
-          if (trim.startsWith('var ')) {
-            const comments = collectComments(i);
-            if (trim.includes('(')) {
-              const { source, end } = collectBlock(i);
-              const fullSrc = comments ? comments + '\n' + source : source;
-              decls.variables.push({ kind: 'var', name: 'var block', source: fullSrc, file: filePath, repo, startLine: i + 1 });
-              i = end + 1;
-            } else {
-              const m = trim.match(/^var\s+(\w+)/);
-              const fullSrc = comments ? comments + '\n' + line : line;
-              decls.variables.push({ kind: 'var', name: m?.[1] || 'var', source: fullSrc, file: filePath, repo, startLine: i + 1 });
-              i++;
-            }
-            continue;
-          }
-          
-          i++;
         }
         
         return decls;
@@ -846,17 +694,7 @@
           lines.push(decl.signature);
           return lines.join('\n');
         }
-        
-        if (!decl.hasBody) return decl.source;
-        const srcLines = decl.source.split('\n');
-        const result = [];
-        for (const l of srcLines) {
-          if (l.trim().startsWith('//')) result.push(l);
-          else break;
-        }
-        const sig = decl.source.match(/(func\s+(?:\([^)]+\)\s*)?\w+\s*(?:\[.*?\])?\s*\([^)]*\)\s*(?:\([^)]*\)|[\w\[\]\*\.\s,]+)?)/);
-        if (sig) result.push(sig[1]);
-        return result.join('\n');
+        return decl.source;
       }
     };
 
@@ -900,7 +738,10 @@
         const ctOps = new Set();
         
         // Wait for WASM to finish loading
-        await wasmPromise;
+        const wasmOk = await wasmPromise;
+        if (!wasmOk) {
+          return Result.err('WASM parser failed to load. Check browser console.');
+        }
         
         const parsed = urls.map(u => ({ url: u, parsed: GitHub.parseUrl(u) })).filter(x => x.parsed);
         if (!parsed.length) return Result.err('No valid GitHub URLs');
@@ -952,7 +793,7 @@
         const okContents = contents.filter(Result.isOk).map(r => r.value);
         
         ctOps.add('Functor');
-        onProgress({ stage: 'parse', message: wasmReady ? 'Parsing with go/ast...' : 'Parsing (regex)...' });
+        onProgress({ stage: 'parse', message: 'Parsing with go/ast...' });
         const parsedDecls = Functor.Array.fmap(f => GoParser.parse(f.content, f.path, `${f.owner}/${f.repo}`), okContents);
         
         ctOps.add('Foldable');
@@ -983,10 +824,10 @@
       const [toast, setToast] = useState(null);
       const [ctOps, setCtOps] = useState([]);
       const [lastKey, setLastKey] = useState(null);
-      const [parserMode, setParserMode] = useState('loading');
+      const [wasmStatus, setWasmStatus] = useState('loading');
       
       useEffect(() => {
-        wasmPromise.then(ok => setParserMode(ok ? 'wasm' : 'regex'));
+        wasmPromise.then(ok => setWasmStatus(ok ? 'ready' : 'error'));
       }, []);
       
       const addUrl = () => setUrls([...urls, { id: Date.now(), value: '' }]);
@@ -1128,8 +969,7 @@
               <div className="logo-icon">🔺</div>
               <span>Pure Go Prism</span>
               <span className="tag">CT</span>
-              {parserMode === 'wasm' && <span className="tag wasm">WASM</span>}
-              {parserMode === 'regex' && <span className="tag regex">Regex</span>}
+              {wasmStatus === 'ready' && <span className="tag wasm">WASM</span>}
             </div>
             {decls && (
               <div className="header-stats">
@@ -1270,8 +1110,8 @@
                   <div className="empty-title">Pure Go Prism</div>
                   <div>Enter GitHub URLs and click Explore</div>
                   <div style={{ marginTop: '0.5rem', fontSize: '11px' }}>
-                    {parserMode === 'wasm' ? '✅ WASM parser (go/ast) ready' : 
-                     parserMode === 'regex' ? '⚠️ Using regex fallback' : 
+                    {wasmStatus === 'ready' ? '✅ WASM parser (go/ast) ready' : 
+                     wasmStatus === 'error' ? '❌ WASM failed to load - check console' : 
                      '⏳ Loading WASM parser...'}
                   </div>
                 </div>
